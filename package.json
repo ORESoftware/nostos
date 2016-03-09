@@ -1,0 +1,24 @@
+{
+  "name": "nostos",
+  "version": "0.0.1",
+  "description": "Auto-commit and auto-push multiple projects recursively, for switching between machines",
+  "main": "index.js",
+  "scripts": {
+    "test": "suman"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ORESoftware/nostos.git"
+  },
+  "keywords": [
+    "git",
+    "auto-commit",
+    "auto-push"
+  ],
+  "author": "Olegzandr Denman",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ORESoftware/nostos/issues"
+  },
+  "homepage": "https://github.com/ORESoftware/nostos#readme"
+}
