@@ -1,7 +1,6 @@
-/**
- * Created by amills001c on 3/9/16.
- */
+#!/usr/bin/env node
 
+//https://www.xormedia.com/git-check-if-a-commit-has-been-pushed/
 
 const async = require('async');
 const fs = require('fs');
@@ -11,6 +10,8 @@ const os = require('os');
 
 const args = process.argv.slice(2);
 const $path = args[0] || process.cwd();
+
+const force = args.indexOf('--force') > -1;
 
 
 const gitPaths = [];
@@ -50,27 +51,56 @@ async.map(gitPaths, function (item, cb) {
     item = arr.join(path.sep);
 
     var command;
-    if (os.platform() === 'win32') {
-        command = 'cd ' + path.normalize(item);
-    }
-    else {
-        command = 'cd ' + path.normalize(item) + ' && git status --short';
-    }
 
-    cp.exec(command, {}, function (err, data) {
-        if (err) {
-            cb(err);
+    if(force){
+
+        if (os.platform() === 'win32') {
+            command = 'cd ' + path.normalize(item);
         }
         else {
-            var result = String(data).match(/^\s/);
-            if (result) {
-                cb(null, orig);
-            }
-            else {
+            command = 'cd ' + path.normalize(item) + ' && git add . && git add -A && git commit -am "auto-commit" && git push';
+        }
+
+        cp.exec(command, {}, function (err, data) {
+            if (err) {
+                console.error(err);
                 cb(null);
             }
+            else {
+                var result = String(data).match(/^\s/);
+                if (result) {
+                    cb(null, orig);
+                }
+                else {
+                    cb(null);
+                }
+            }
+        });
+
+    }
+    else{
+        if (os.platform() === 'win32') {
+            command = 'cd ' + path.normalize(item);
         }
-    });
+        else {
+            command = 'cd ' + path.normalize(item) + ' && git status --short';
+        }
+
+        cp.exec(command, {}, function (err, data) {
+            if (err) {
+                cb(err);
+            }
+            else {
+                var result = String(data).match(/^\s/);
+                if (result) {
+                    cb(null, orig);
+                }
+                else {
+                    cb(null);
+                }
+            }
+        });
+    }
 
 
 }, function complete(err, results) {
@@ -85,13 +115,16 @@ async.map(gitPaths, function (item, cb) {
         }).forEach(function (item) {
             if(allGood){
                 allGood = false;
-                console.log('The follow git repos have uncommitted material.');
+                console.log('\nNostos: The following git repos have uncommitted material.');
             }
-            console.log(item);
+            console.log(' => ', item);
         });
         if(allGood){
-            console.log('Given the following path: '+ $path);
-            console.log('Not one git repo has uncommitted code, you are all good.');
+            console.log('\nGiven the following path: '+ $path);
+            console.log('We searched all directories below, and not one git repo has uncommitted code, you are all good.');
+        }
+        else{
+            console.log('\n');
         }
     }
 
