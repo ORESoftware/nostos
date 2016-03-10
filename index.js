@@ -43,9 +43,8 @@ function recurse(dir) {
 
 recurse($path);
 
-console.log(gitPaths);
 
-async.each(gitPaths, function (item, cb) {
+async.map(gitPaths, function (item, cb) {
 
     const orig = String(path.normalize(item));
     var arr = item.split(path.sep);
@@ -69,6 +68,9 @@ async.each(gitPaths, function (item, cb) {
             var result = String(data).split('\n');
             if(result.length < 1){
                 cb(null);
+            }
+            else{
+                cb(null,orig);
             }
 
         }
