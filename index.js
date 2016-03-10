@@ -65,6 +65,7 @@ async.each(gitPaths, function (item, cb) {
             cb(err);
         }
         else{
+            console.log(data);
             var result = String(data).split('\n');
             if(result.length < 1){
                 cb(null);
