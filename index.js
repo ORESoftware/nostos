@@ -56,21 +56,21 @@ async.map(gitPaths, function (item, cb) {
         command = 'cd ' + path.normalize(item);
     }
     else {
-        command = 'cd ' + path.normalize(item) + ' && git status --s';
+        command = 'cd ' + path.normalize(item) + ' && git status --short';
     }
 
     cp.exec(command, {}, function (err, data) {
         if (err) {
             cb(err);
         }
-        else{
+        else {
             console.log(data);
-            var result = String(data).split('\n');
-            if(result.length < 1){
-                cb(null);
+            var result = String(data).match(/^\s/);
+            if (result) {
+                cb(null, orig);
             }
-            else{
-                cb(null,orig);
+            else {
+                cb(null);
             }
 
         }
@@ -83,9 +83,9 @@ async.map(gitPaths, function (item, cb) {
         console.log(err);
     }
     else {
-        results.filter(function(item){
+        results.filter(function (item) {
             return item && String(item).length > 0;
-        }).forEach(function(item){
+        }).forEach(function (item) {
             console.log(item);
         });
     }
