@@ -1,7 +1,7 @@
 {
   "name": "nostos",
   "version": "0.0.1",
-  "description": "Auto-commit and auto-push multiple projects recursively, for switching between machines",
+  "description": "Auto-commit and/or auto-push multiple projects recursively, for switching between machines",
   "main": "index.js",
   "scripts": {
     "test": "suman"
@@ -20,5 +20,8 @@
   "bugs": {
     "url": "https://github.com/ORESoftware/nostos/issues"
   },
-  "homepage": "https://github.com/ORESoftware/nostos#readme"
+  "homepage": "https://github.com/ORESoftware/nostos#readme",
+  "dependencies": {
+    "async": "^1.5.2"
+  }
 }
