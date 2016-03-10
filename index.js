@@ -7,14 +7,11 @@ const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
 const os = require('os');
-
 const args = process.argv.slice(2);
 const $path = path.resolve(args[0] || process.cwd());
-
 const force = args.indexOf('--force') > -1;
-
-
 const gitPaths = [];
+
 
 function endsWith(str, suffix) {
     return str.indexOf(suffix, str.length - suffix.length) !== -1;
@@ -58,7 +55,8 @@ async.map(gitPaths, function (item, cb) {
             command = 'cd ' + path.normalize(item);
         }
         else {
-            command = 'cd ' + path.normalize(item) + ' && git add . && git add -A && git commit -am "auto-commit" && git push';
+            //command = 'cd ' + path.normalize(item) + ' && git add . && git add -A && git commit -am "auto-commit" && git push';
+            command = 'cd ' + path.normalize(item) + ' && git log @{u}..';
         }
 
         cp.exec(command, {}, function (err, data) {
@@ -67,6 +65,7 @@ async.map(gitPaths, function (item, cb) {
                 cb(null);
             }
             else {
+                console.log('data:',data);
                 var result = String(data).match(/^\s/);
                 if (result) {
                     cb(null, orig);
