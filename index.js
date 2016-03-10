@@ -72,7 +72,7 @@ async.map(gitPaths, function (item, cb) {
                     cb(null, orig);
                 }
                 else {
-                    cb(null);
+                    cb(null); ///
                 }
             }
         });
