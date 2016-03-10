@@ -19,7 +19,7 @@ function endsWith(str, suffix) {
     return str.indexOf(suffix, str.length - suffix.length) !== -1;
 }
 
-function recurse(dir) {
+(function recurse(dir) {
 
     var stat;
 
@@ -39,9 +39,7 @@ function recurse(dir) {
 
     });
 
-}
-
-recurse($path);
+})($path);
 
 
 async.map(gitPaths, function (item, cb) {
@@ -72,13 +70,11 @@ async.map(gitPaths, function (item, cb) {
             else {
                 cb(null);
             }
-
         }
     });
 
 
 }, function complete(err, results) {
-
     if (err) {
         console.log(err);
     }
