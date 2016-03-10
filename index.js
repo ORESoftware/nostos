@@ -9,7 +9,7 @@ const cp = require('child_process');
 const os = require('os');
 
 const args = process.argv.slice(2);
-const $path = args[0] || process.cwd();
+const $path = path.resolve(args[0] || process.cwd());
 
 const force = args.indexOf('--force') > -1;
 
@@ -121,7 +121,7 @@ async.map(gitPaths, function (item, cb) {
         });
         if(allGood){
             console.log('\nGiven the following path: '+ $path);
-            console.log('We searched all directories below, and not one git repo has uncommitted code, you are all good.');
+            console.log('We searched all directories below, and not one git repo has uncommitted code, you are all good.\n');
         }
         else{
             console.log('\n');
