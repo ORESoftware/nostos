@@ -62,7 +62,6 @@ async.map(gitPaths, function (item, cb) {
             cb(err);
         }
         else {
-            console.log(data);
             var result = String(data).match(/^\s/);
             if (result) {
                 cb(null, orig);
@@ -79,11 +78,21 @@ async.map(gitPaths, function (item, cb) {
         console.log(err);
     }
     else {
+
+        var allGood = true;
         results.filter(function (item) {
             return item && String(item).length > 0;
         }).forEach(function (item) {
+            if(allGood){
+                allGood = false;
+                console.log('The follow git repos have uncommitted material.');
+            }
             console.log(item);
         });
+        if(allGood){
+            console.log('Given the following path: '+ $path);
+            console.log('Not one git repo has uncommitted code, you are all good.');
+        }
     }
 
 });
