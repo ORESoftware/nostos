@@ -178,7 +178,7 @@ async.map(gitPaths, function (item, cb) {
         }
         else {
             var runPush = false;
-            results.filter(function (item) {
+            results = results.filter(function (item) {
                 return item;
             }).forEach(function () {
                 runPush = true;
@@ -210,6 +210,9 @@ async.map(gitPaths, function (item, cb) {
                         }
                     }
                 });
+            }
+            else if(force){
+                cb(null, results);
             }
             else if (runPush) {
                 cb(null, {
