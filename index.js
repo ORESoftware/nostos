@@ -174,8 +174,8 @@ async.map(gitPaths, function (item, cb) {
                         else {
                             console.log('stdout:', stdout);
                             console.log('stderr:', stderr);
-                            const error1 = String(stdout).match(/Error/i); //match any non-whitespace
-                            const error2 = String(stderr).match(/\S/);
+                            const error1 = String(stdout).match(/Error/i);
+                            const error2 = String(stderr).match(/Error/i);
                             if (error1 || error2) {
                                 cb(null, orig);
                             }
