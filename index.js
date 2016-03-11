@@ -109,7 +109,11 @@ async.map(gitPaths, function (item, cb) {
                         console.log('stdout git log --oneline:', stdout);
                         console.log('stderr git log --oneline:', stderr);
                         var result = String(stdout).match(/\S/); //match any non-whitespace
-                        if (result) {
+                        var error = String(stderr).match(/\S/); //match any non-whitespace
+                        if (error) {
+                            cb(stderr);
+                        }
+                        else if (result) {
                             cb(null, orig);
                         }
                         else {
@@ -130,7 +134,12 @@ async.map(gitPaths, function (item, cb) {
                         console.log('stdout status short:', stdout);
                         console.log('stderr status short:', stderr);
                         var result = String(stdout).match(/\S/); //match any non-whitespace
-                        if (result) {
+                        var error = String(stderr).match(/\S/); //match any non-whitespace
+
+                        if (error) {
+                            cb(stderr);
+                        }
+                        else if (result) {
                             cb(null, orig);
                         }
                         else {
@@ -177,7 +186,7 @@ async.map(gitPaths, function (item, cb) {
                     });
                 }
                 else {
-                    console.log('All git repos up to date.');
+                    console.log('All git repos up to date.\n');
                 }
             }
         });
