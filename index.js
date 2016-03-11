@@ -161,7 +161,7 @@ async.map(gitPaths, function (item, cb) {
             console.log(' => ', item);
         });
         if (allGood) {
-            console.log('\nGiven the following path: ' + $path);
+            console.log('\nGiven the following path(s): ' + paths);
             console.log('We searched all directories below, and not one git repo has uncommitted code, you are all good.\n');
         }
         else {
