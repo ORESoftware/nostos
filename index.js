@@ -80,8 +80,6 @@ paths.map(function(p){
 });
 
 
-
-
 async.map(gitPaths, function (item, cb) {
 
     const orig = String(path.normalize(item));
@@ -98,7 +96,6 @@ async.map(gitPaths, function (item, cb) {
         }
         else {
             command = 'cd ' + path.normalize(item) + ' && git add . && git add -A && git commit -am "auto-commit" && git push';
-            //command = 'cd ' + path.normalize(item) + ' && git log @{u}..';
         }
 
         cp.exec(command, {}, function (err, data) {
@@ -150,6 +147,8 @@ async.map(gitPaths, function (item, cb) {
     }
     else {
 
+        console.log('Results:',results);
+
         var allGood = true;
         results.filter(function (item) {
             return item && String(item).length > 0;
@@ -169,7 +168,6 @@ async.map(gitPaths, function (item, cb) {
         }
     }
 
-    ////
 });
 
 
