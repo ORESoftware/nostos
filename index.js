@@ -176,8 +176,10 @@ async.map(gitPaths, function (item, cb) {
 
         if (err) {
             console.error(err);
+            cb(null);
         }
         else {
+
             var runPush = false;
             results = results.filter(function (item) {
                 return item;
@@ -202,19 +204,21 @@ async.map(gitPaths, function (item, cb) {
                             cb(null, {
                                 root: orig,
                                 error: (stdout + '\n' + stderr),
-                                git: 'run-all'
+                                git: 'run-all',
+                                push: false
                             });
                         }
                         else {
                             cb(null, {
-                                push: orig
+                                push: true,
+                                root: orig
                             });
                         }
                     }
                 });
             }
-            else if(force){  //
-                cb(null, results);
+            else if (force) {  //
+                cb(null, {});
             }
             else if (runPush) {
                 cb(null, {
@@ -244,11 +248,27 @@ async.map(gitPaths, function (item, cb) {
             return item && String(item).length > 0;
 
         }).forEach(function (item) {
-            if (allGood) {
+
+            if (item.error) {
                 allGood = false;
-                console.log('\nNostos: The following project roots have uncommitted/unpushed material, or git errors, or both.');
+                console.log('\nNostos: The following project roots git errors.');
+                console.log(' => ', JSON.stringify(item.root), '\n');
             }
-            console.log(' => ', JSON.stringify(item.root), '\n');
+            else if (item.push === null) {
+                console.log('\nNostos: The following project experienced no errors, but were not pushed.');
+                console.log(' => ', JSON.stringify(item.root), '\n');
+            }
+            else if (item.push === true) {
+                allGood = false;
+                console.log('\nNostos: The following project roots had uncommitted or unpushed changes, and were pushed successfully.');
+                console.log(' => ', JSON.stringify(item.root), '\n');
+            }
+            else if (item.push === false) {
+                allGood = false;
+                console.log('\nNostos warning: The following project experienced no errors, but were not pushed.');
+                console.log(' => ', JSON.stringify(item.root), '\n');
+            }
+
         });
 
         if (allGood) {
