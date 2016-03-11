@@ -34,26 +34,26 @@ function endsWith(str, suffix) {
 
 const paths = [];
 
-try{
-    assert(parsedArgs.argv.remain.length > 0,'No file path(s) provided.');
-    paths.push.apply(paths,parsedArgs.argv.remain);
+try {
+    assert(parsedArgs.argv.remain.length > 0, 'No file path(s) provided.');
+    paths.push.apply(paths, parsedArgs.argv.remain);
 }
-catch(err){
+catch (err) {
     console.log('Using current working directory.');
     paths.push(process.cwd());
 }
 
-paths.map(function(p){
+paths.map(function (p) {
 
     return p && path.resolve(path.normalize(p));
 
-}).filter(function(p){
+}).filter(function (p) {
 
     return p && path.isAbsolute(p);
 
-}).forEach(function($path,index){
+}).forEach(function ($path, index) {
 
-    console.log('$path:',$path);
+    console.log('$path:', $path);
 
     (function recurse(dir) {
 
@@ -80,40 +80,110 @@ paths.map(function(p){
 });
 
 
+console.log('gitpaths =', gitPaths);
+
 async.map(gitPaths, function (item, cb) {
 
-    const orig = String(path.normalize(item));
-    var arr = item.split(path.sep);
-    arr.pop();
-    item = arr.join(path.sep);
+    const orig = String(path.normalize(path.resolve(item + '/../')));
 
     var command;
 
     if (force) {
 
         if (os.platform() === 'win32') {
-            command = 'cd ' + path.normalize(item);
+            command = 'cd ' + path.normalize(orig);
         }
         else {
-            command = 'cd ' + path.normalize(item) + ' && git add . && git add -A && git commit -am "auto-commit" && git push';
+            command = 'cd ' + path.normalize(orig);
         }
 
-        cp.exec(command, {}, function (err, data) {
+        async.parallel([
+            function (cb) {
+                const c = command + ' && git log --oneline origin/master..HEAD';
+                console.log('c1:',c);
+                cp.exec(command, {}, function (err, data) {
+                    if (err) {
+                        cb(err);
+                    }
+                    else {
+                        console.log('data git log --oneline:', data);
+                        var result = null;
+                        if (result) {
+                            cb(null, orig);
+                        }
+                        else {
+                            cb(null); ////////
+                        }
+                    }
+                });
+
+            },
+            function (cb) {
+                const c = command + ' && git status --short';
+                console.log('c2:',c);
+                cp.exec(command, {}, function (err, data) {
+                    if (err) {
+                        cb(err);
+                    }
+                    else {
+                        console.log('data status short:', data);
+                        var result = String(data).match(/\S/); //match any non-whitespace
+                        if (result) {
+                            cb(null, orig);
+                        }
+                        else {
+                            cb(null); ////////
+                        }
+                    }
+                });
+            }
+
+        ], function complete(err, results) {
+
             if (err) {
                 console.error(err);
-                cb(null);
             }
             else {
-                console.log('data:', data);
-                var result = null;
-                if (result) {
-                    cb(null, orig);
+                var runPush = true;
+
+                results.filter(function (item) {
+
+                }).forEach(function () {
+                    if (runPush) {
+                        runPush = false;
+                    }
+
+                });
+
+                if (runPush) {
+
+                    const c = command + ' && git add . && git add -A && git commit -am "auto-commit" && git push';
+
+                    cp.exec(command, {}, function (err, data) {
+                        if (err) {
+                            console.error(err);
+                            cb(null);
+                        }
+                        else {
+                            console.log('data:', data);
+                            var error = String(data).match(/Error/i); //match any non-whitespace
+                            if (error) {
+                                console.log(data);
+                                cb(null, orig);
+                            }
+                            else {
+                                cb(null); ////////
+                            }
+                        }
+                    });
                 }
                 else {
-                    cb(null); //////
+
+                    console.log('no run push.');
                 }
             }
         });
+
 
     }
     else {
@@ -147,7 +217,7 @@ async.map(gitPaths, function (item, cb) {
     }
     else {
 
-        console.log('Results:',results);
+        console.log('Results:', results);
 
         var allGood = true;
         results.filter(function (item) {
