@@ -129,7 +129,7 @@ async.map(gitPaths, function (item, cb) {
                 cb(err);
             }
             else {
-                var result = String(data).match(/\S/);
+                var result = String(data).match(/\S/); //match any non-whitespace
                 if (result) {
                     cb(null, orig);
                 }
