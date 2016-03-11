@@ -12,6 +12,7 @@ const cp = require('child_process');
 const os = require('os');
 const debug = require('debug')('nostos:core');
 const colors = require('colors/safe');
+const _ = require('lodash');
 
 
 const gitPaths = [];
@@ -187,7 +188,6 @@ async.map(gitPaths, function (item, cb) {
             if (force && runPush) {
 
                 const c = 'git add . && git add -A && git commit -am "auto-commit" && git push';
-
                 cp.exec(c, {cwd: $cwd}, function (err, stdout, stderr) {
                     if (err) {
                         console.error(err);
@@ -206,7 +206,9 @@ async.map(gitPaths, function (item, cb) {
                             });
                         }
                         else {
-                            cb(null);
+                            cb(null, {
+                                push: orig
+                            });
                         }
                     }
                 });
