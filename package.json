@@ -26,6 +26,8 @@
   "homepage": "https://github.com/ORESoftware/nostos#readme",
   "dependencies": {
     "async": "^1.5.2",
+    "colors": "^1.1.2",
+    "debug": "^2.2.0",
     "nopt": "^3.0.6"
   },
   "devDependencies": {

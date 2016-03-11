@@ -10,8 +10,11 @@ const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
 const os = require('os');
-const gitPaths = [];
+const debug = require('debug')('nostos:core');
+const colors = require('colors/safe');
 
+
+const gitPaths = [];
 
 const knownOpts = Object.freeze({
     force: Boolean
@@ -24,7 +27,7 @@ const shortHands = Object.freeze({
 
 const parsedArgs = nopt(knownOpts, shortHands, process.argv, 2);
 
-console.log(parsedArgs);
+debug(parsedArgs);
 
 const force = parsedArgs.force;
 
@@ -32,55 +35,67 @@ function endsWith(str, suffix) {
     return str.indexOf(suffix, str.length - suffix.length) !== -1;
 }
 
-const paths = [];
+var paths = [];
 
 try {
     assert(parsedArgs.argv.remain.length > 0, 'No file path(s) provided.');
     paths.push.apply(paths, parsedArgs.argv.remain);
 }
 catch (err) {
-    console.log('Using current working directory.');
+    //console.log('nostos cmd utility is using your current working directory, b/c you did not pass in a path.');
     paths.push(process.cwd());
 }
 
-paths.map(function (p) {
+paths = paths.map(function (p) {
 
     return p && path.resolve(path.normalize(p));
 
-}).filter(function (p) {
+});
+
+paths.filter(function (p) {
 
     return p && path.isAbsolute(p);
 
 }).forEach(function ($path, index) {
 
-    console.log('$path:', $path);
+    debug('index =>' + index + ', path =>' + $path);
 
     (function recurse(dir) {
 
         var stat;
 
-        fs.readdirSync(dir).forEach(function (item) {
+        try {
+            fs.readdirSync(dir).forEach(function (item) {
 
-            item = path.resolve(path.normalize(dir + '/' + item));
+                item = path.resolve(path.normalize(dir + '/' + item));
 
-            if (endsWith(item, '.git')) {
-                gitPaths.push(item);  //we stop recursion if we hit first .git dir on a path
-            }
-            else {
-                stat = fs.statSync(item);
-                if (stat.isDirectory()) {
-                    recurse(item);
+                if (endsWith(item, '.git')) {
+                    gitPaths.push(item);  //we stop recursion if we hit first .git dir on a path
                 }
-            }
+                else {
+                    stat = fs.statSync(item);
+                    if (stat.isDirectory()) {
+                        recurse(item);
+                    }
+                }
 
-        });
+            });
+        }
+        catch (err) {
+            console.log('\n', 'The following path was assumed to be a directory but it is not valid =>', '\n', colors.grey(dir));
+        }
 
     })($path);
 
 });
 
 
-console.log('gitpaths =', gitPaths);
+debug('gitpaths = \n', gitPaths);
+
+if (gitPaths.length < 1) {
+    console.log('\n', colors.magenta('Warning => No git projects found given the root path(s) used =>'), '\n', colors.grey(paths.map(p => '"' + p + '"' + '\n')), '\n');
+    return;
+}
 
 async.map(gitPaths, function (item, cb) {
 
@@ -88,146 +103,126 @@ async.map(gitPaths, function (item, cb) {
 
     var $cwd;
 
-    if (force) {
+    if (os.platform() === 'win32') {
+        $cwd = path.normalize(orig);
+    }
+    else {
+        $cwd = path.normalize(orig);
+    }
 
-        if (os.platform() === 'win32') {
-            $cwd = path.normalize(orig);
+    async.parallel([
+        function (cb) {
+            const c = ('git log --oneline origin/master..HEAD');
+            cp.exec(c, {cwd: $cwd}, function (err, stdout, stderr) {
+                if (err) {
+                    cb(err);
+                }
+                else {
+                    debug('stdout git log --oneline:', stdout);
+                    debug('stderr git log --oneline:', stderr);
+                    var result = String(stdout).match(/\S/); //match any non-whitespace
+                    var error = String(stderr).match(/Error/i);
+                    if (error) {
+                        cb(null, {
+                            error: stderr,
+                            root: orig,
+                            git: 'push'
+                        });
+                    }
+                    else if (result) {
+                        cb(null, orig);
+                    }
+                    else {
+                        cb(null);
+                    }
+                }
+            });
+
+        },
+        function (cb) {
+            const c = ('git status --short');
+            cp.exec(c, {cwd: $cwd}, function (err, stdout, stderr) {
+                if (err) {
+                    cb(err);
+                }
+                else {
+                    debug('\nstdout status short:\n' + stdout);
+                    debug('\nstderr status short:\n' + stderr);
+
+                    var result = String(stdout).match(/\S/); //match any non-whitespace
+                    var error = String(stderr).match(/Error/i);
+
+                    if (error) {
+                        cb(null, {
+                            git: 'commit',
+                            error: stderr,
+                            root: orig
+                        });
+                    }
+                    else if (result) {
+                        cb(null, {
+                            root: orig
+                        });
+                    }
+                    else {
+                        cb(null);
+                    }
+                }
+            });
+        }
+
+    ], function complete(err, results) {
+
+        if (err) {
+            console.error(err);
         }
         else {
-            $cwd = path.normalize(orig);
+            var runPush = false;
+            results.filter(function (item) {
+                return item;
+            }).forEach(function () {
+                runPush = true;
+            });
+
+            if (force && runPush) {
+
+                const c = 'git add . && git add -A && git commit -am "auto-commit" && git push';
+
+                cp.exec(c, {cwd: $cwd}, function (err, stdout, stderr) {
+                    if (err) {
+                        console.error(err);
+                        cb(null);
+                    }
+                    else {
+                        debug('\nrun push stdout:\n' + stdout);   //TODO: if no upstream is defined, does stdout or stderr show "error" or "Error"??
+                        debug('\nrun push stderr:\n' + stderr);
+                        const error1 = String(stdout).match(/Error/i);
+                        const error2 = String(stderr).match(/Error/i);
+                        if (error1 || error2) {
+                            cb(null, {
+                                root: orig,
+                                error: (stdout + '\n' + stderr),
+                                git: 'run-all'
+                            });
+                        }
+                        else {
+                            cb(null);
+                        }
+                    }
+                });
+            }
+            else if (runPush) {
+                cb(null, {
+                    root: orig,
+                    git: 'run-all'
+                });
+            }
+            else {
+                console.log('All git repos up to date.\n');
+                cb(null);
+            }
         }
-
-        async.parallel([
-            function (cb) {
-                const c = ('git log --oneline origin/master..HEAD');
-                console.log('c1:', c);
-                cp.exec(c, {cwd: $cwd}, function (err, stdout, stderr) {
-                    if (err) {
-                        cb(err);
-                    }
-                    else {
-                        console.log('stdout git log --oneline:', stdout);
-                        console.log('stderr git log --oneline:', stderr);
-                        var result = String(stdout).match(/\S/); //match any non-whitespace
-                        var error = String(stderr).match(/Error/i);
-                        if (error) {
-                            cb(null, {error: stderr});
-                        }
-                        else if (result) {
-                            cb(null, orig);
-                        }
-                        else {
-                            cb(null);
-                        }
-                    }
-                });
-
-            },
-            function (cb) {
-                const c = ('git status --short');
-                console.log('c2:', c);
-                cp.exec(c, {cwd: $cwd}, function (err, stdout, stderr) {
-                    if (err) {
-                        cb(err);
-                    }
-                    else {
-                        console.log('stdout status short:', stdout);
-                        console.log('stderr status short:', stderr);
-                        var result = String(stdout).match(/\S/); //match any non-whitespace
-                        var error = String(stderr).match(/Error/i);
-
-                        if (error) {
-                            cb(null, {
-                                error: stderr,
-                                root: orig
-                            });
-                        }
-                        else if (result) {
-                            cb(null, {
-                                root: orig
-                            });
-                        }
-                        else {
-                            cb(null);
-                        }
-                    }
-                });
-            }
-
-        ], function complete(err, results) {
-
-            if (err) {
-                console.error(err);
-            }
-            else {
-                var runPush = false;
-                results.filter(function (item) {
-                    return item;
-                }).forEach(function () {
-                    runPush = true;
-                });
-
-                if (runPush) {
-
-                    const c = 'git add . && git add -A && git commit -am "auto-commit" && git push';
-
-                    cp.exec(c, {cwd: $cwd}, function (err, stdout, stderr) {
-                        if (err) {
-                            console.error(err);
-                            cb(null);
-                        }
-                        else {
-                            console.log('stdout:', stdout);   //TODO: if no upstream is defined, does stdout or stderr show "error" or "Error"??
-                            console.log('stderr:', stderr);
-                            const error1 = String(stdout).match(/Error/i);
-                            const error2 = String(stderr).match(/Error/i);
-                            if (error1 || error2) {
-                                cb(null, {
-                                    root: orig,
-                                    error: (stdout + '\n' + stderr)
-                                });
-                            }
-                            else {
-                                cb(null);
-                            }
-                        }
-                    });
-                }
-                else {
-                    console.log('All git repos up to date.\n');
-                }
-            }
-        });
-
-
-    }
-    else {  //
-
-        var c = os.platform() === 'win32' ? 'cd ' + path.normalize(orig) :
-        'cd ' + path.normalize(orig) + ' && git status --short';
-
-        cp.exec(c, {}, function (err, stdout, stderr) {
-            if (err) {
-                cb(err);
-            }
-            else {
-                const result = String(stdout).match(/\S/); //match any non-whitespace
-                const error = String(stderr).match(/Error/i); //match any non-whitespace
-                if (error) {
-                    cb(null, {
-                        error: error,
-                        root: orig
-                    });
-                }
-                if (result) {
-                    cb(null, {root: orig});
-                }
-                else {
-                    cb(null);
-                }
-            }
-        });
-    }
+    });
 
 
 }, function complete(err, results) {
@@ -235,7 +230,7 @@ async.map(gitPaths, function (item, cb) {
         console.log(err);
     }
     else {
-        console.log('Results:', results);
+        debug('Results => \n', results);
 
         var allGood = true;
 
@@ -246,14 +241,14 @@ async.map(gitPaths, function (item, cb) {
         }).forEach(function (item) {
             if (allGood) {
                 allGood = false;
-                console.log('\nNostos: The following git repos have uncommitted material.');
+                console.log('\nNostos: The following project roots have uncommitted/unpushed material, or git errors, or both.');
             }
-            console.log(' => ', item);
+            console.log(' => ', JSON.stringify(item.root), '\n');
         });
 
         if (allGood) {
             console.log('\nGiven the following path(s): ' + paths);
-            console.log('We searched all directories below, and not one git repo has uncommitted code, you are all good.\n');
+            console.log('We searched all git projects, and not one git repo has uncommitted/unpushed code, you are all good.\n');
         }
         else {
             console.log('\n');
