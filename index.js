@@ -248,7 +248,7 @@ async.map(gitPaths, function (item, cb) {
 
 }, function complete(err, results) {
     if (err) {
-        console.log(err);
+        console.error('NOSTOS error:\n', err);  //is the sudo error here
     }
     else {
         debug('Results => \n', results);
@@ -272,7 +272,7 @@ async.map(gitPaths, function (item, cb) {
             }
             else if (item.push === true) {
                 allGood = false;
-                console.log('\nNostos: The following project roots had uncommitted or unpushed changes, and were pushed successfully.');
+                console.log('\nNostos: The following project root had uncommitted or unpushed changes, and was pushed successfully.');
                 console.log(' => ', JSON.stringify(item.root), '\n');
             }
             else if (item.push === false) {
