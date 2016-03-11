@@ -86,53 +86,55 @@ async.map(gitPaths, function (item, cb) {
 
     const orig = String(path.normalize(path.resolve(item + '/../')));
 
-    var command;
+    var $cwd;
 
     if (force) {
 
         if (os.platform() === 'win32') {
-            command = 'cd ' + path.normalize(orig);
+            $cwd = path.normalize(orig);
         }
         else {
-            command = 'cd ' + path.normalize(orig);
+            $cwd = path.normalize(orig);
         }
 
         async.parallel([
             function (cb) {
-                const c = command + ' && git log --oneline origin/master..HEAD';
-                console.log('c1:',c);
-                cp.exec(command, {}, function (err, data) {
+                const c = ('git log --oneline origin/master..HEAD');
+                console.log('c1:', c);
+                cp.exec(c, {cwd: $cwd}, function (err, stdout, stderr) {
                     if (err) {
                         cb(err);
                     }
                     else {
-                        console.log('data git log --oneline:', data);
-                        var result = null;
+                        console.log('stdout git log --oneline:', stdout);
+                        console.log('stderr git log --oneline:', stderr);
+                        var result = String(stdout).match(/\S/); //match any non-whitespace
                         if (result) {
                             cb(null, orig);
                         }
                         else {
-                            cb(null); ////////
+                            cb(null);
                         }
                     }
                 });
 
             },
             function (cb) {
-                const c = command + ' && git status --short';
-                console.log('c2:',c);
-                cp.exec(command, {}, function (err, data) {
+                const c = ('git status --short');
+                console.log('c2:', c);
+                cp.exec(c, {cwd: $cwd}, function (err, stdout, stderr) {
                     if (err) {
                         cb(err);
                     }
                     else {
-                        console.log('data status short:', data);
-                        var result = String(data).match(/\S/); //match any non-whitespace
+                        console.log('stdout status short:', stdout);
+                        console.log('stderr status short:', stderr);
+                        var result = String(stdout).match(/\S/); //match any non-whitespace
                         if (result) {
                             cb(null, orig);
                         }
                         else {
-                            cb(null); ////////
+                            cb(null);
                         }
                     }
                 });
@@ -144,42 +146,37 @@ async.map(gitPaths, function (item, cb) {
                 console.error(err);
             }
             else {
-                var runPush = true;
-
+                var runPush = false;
                 results.filter(function (item) {
-
+                    return item;
                 }).forEach(function () {
-                    if (runPush) {
-                        runPush = false;
-                    }
-
+                    runPush = true;
                 });
 
                 if (runPush) {
 
-                    const c = command + ' && git add . && git add -A && git commit -am "auto-commit" && git push';
+                    const c = 'git add . && git add -A && git commit -am "auto-commit" && git push';
 
-                    cp.exec(command, {}, function (err, data) {
+                    cp.exec(c, {cwd: $cwd}, function (err, stdout, stderr) {
                         if (err) {
                             console.error(err);
                             cb(null);
                         }
                         else {
                             console.log('data:', data);
-                            var error = String(data).match(/Error/i); //match any non-whitespace
-                            if (error) {
-                                console.log(data);
+                            const error1 = String(stdout).match(/Error/i); //match any non-whitespace
+                            const error2 = String(stderr).match(/\S/);
+                            if (error1 || error2) {
                                 cb(null, orig);
                             }
                             else {
-                                cb(null); ////////
+                                cb(null);
                             }
                         }
                     });
                 }
                 else {
-
-                    console.log('no run push.');
+                    console.log('All git repos up to date.');
                 }
             }
         });
@@ -187,6 +184,9 @@ async.map(gitPaths, function (item, cb) {
 
     }
     else {
+
+        var command;
+
         if (os.platform() === 'win32') {
             command = 'cd ' + path.normalize(item);
         }
