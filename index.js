@@ -3,6 +3,8 @@
 //https://www.xormedia.com/git-check-if-a-commit-has-been-pushed/
 //http://stackoverflow.com/questions/2016901/viewing-unpushed-git-commits/30720302
 
+//TODO: with verbose option, should log status of each git repo
+
 const nopt = require('nopt');
 const assert = require('assert');
 const async = require('async');
@@ -18,11 +20,13 @@ const _ = require('lodash');
 const gitPaths = [];
 
 const knownOpts = Object.freeze({
-    force: Boolean
+    force: Boolean,
+    verbose: Boolean
 });
 
 const shortHands = Object.freeze({
-    f: ['--force']
+    f: ['--force'],
+    v: ['--verbose']
 });
 
 
@@ -119,8 +123,11 @@ async.map(gitPaths, function (item, cb) {
                     cb(err);
                 }
                 else {
-                    debug('stdout git log --oneline:', stdout);
-                    debug('stderr git log --oneline:', stderr);
+                    if (parsedArgs.verbose) {
+                        console.log(colors.cyan('Git repo push status:'));
+                        console.log(stdout);
+                        console.log(stderr);
+                    }
                     var result = String(stdout).match(/\S/); //match any non-whitespace
                     var error = String(stderr).match(/Error/i);
                     if (error) {
@@ -131,7 +138,9 @@ async.map(gitPaths, function (item, cb) {
                         });
                     }
                     else if (result) {
-                        cb(null, orig);
+                        cb(null, {
+                            root: orig
+                        });
                     }
                     else {
                         cb(null);
@@ -147,9 +156,11 @@ async.map(gitPaths, function (item, cb) {
                     cb(err);
                 }
                 else {
-                    debug('\nstdout status short:\n' + stdout);
-                    debug('\nstderr status short:\n' + stderr);
-
+                    if (parsedArgs.verbose) {
+                        console.log(colors.cyan('Git repo commit status (' + $cwd + '/.git) =>'));
+                        console.log(stdout);
+                        console.log(stderr);
+                    }
                     var result = String(stdout).match(/\S/); //match any non-whitespace
                     var error = String(stderr).match(/Error/i);
 
@@ -218,7 +229,9 @@ async.map(gitPaths, function (item, cb) {
                 });
             }
             else if (force) {  //
-                cb(null, {});
+                cb(null, {
+                    push: null
+                });
             }
             else if (runPush) {
                 cb(null, {
@@ -227,7 +240,6 @@ async.map(gitPaths, function (item, cb) {
                 });
             }
             else {
-                console.log('All git repos up to date.\n');
                 cb(null);
             }
         }
@@ -268,6 +280,11 @@ async.map(gitPaths, function (item, cb) {
                 console.log('\nNostos warning: The following project experienced no errors, but were not pushed.');
                 console.log(' => ', JSON.stringify(item.root), '\n');
             }
+            else if (item.root) {
+                allGood = false;
+                console.log('\nNostos warning: The following project has uncommitted or unpushed code =>');
+                console.log(' => ', JSON.stringify(item.root), '\n');
+            }
 
         });
 
@@ -275,9 +292,20 @@ async.map(gitPaths, function (item, cb) {
             console.log('\nGiven the following path(s): ' + paths);
             console.log('We searched all git projects, and not one git repo has uncommitted/unpushed code, you are all good.\n');
         }
-        else {
-            console.log('\n');
-        }//
+        else if (force) {
+            if (parsedArgs.verbose) {
+                console.log('The following repos were checked and covered by nostos:');
+                paths.forEach(function (p) {
+                    console.log(colors.blue(p), '\n');
+                })
+            }
+            else {
+                console.log('All git repos with uncommitted/unpushed code were successfully pushed.');
+            }
+        }
+        else{
+
+        }
     }
 
 });
