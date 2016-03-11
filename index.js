@@ -90,7 +90,7 @@ paths.filter(function (p) {
 });
 
 
-debug('gitpaths = \n', gitPaths);
+debug('gitpaths => \n' + gitPaths);
 
 if (gitPaths.length < 1) {
     console.log('\n', colors.magenta('Warning => No git projects found given the root path(s) used =>'), '\n', colors.grey(paths.map(p => '"' + p + '"' + '\n')), '\n');
@@ -191,7 +191,7 @@ async.map(gitPaths, function (item, cb) {
                 cp.exec(c, {cwd: $cwd}, function (err, stdout, stderr) {
                     if (err) {
                         console.error(err);
-                        cb(null);
+                        cb(err);
                     }
                     else {
                         debug('\nrun push stdout:\n' + stdout);   //TODO: if no upstream is defined, does stdout or stderr show "error" or "Error"??
