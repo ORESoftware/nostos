@@ -105,7 +105,7 @@ async.map(gitPaths, function (item, cb) {
             }
             else {
                 console.log('data:', data);
-                var result = String(data).match(/^\s/);
+                var result = String(data).match(/\S/);
                 if (result) {
                     cb(null, orig);
                 }
