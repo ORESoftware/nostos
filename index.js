@@ -1,43 +1,85 @@
 #!/usr/bin/env node
 
 //https://www.xormedia.com/git-check-if-a-commit-has-been-pushed/
+//http://stackoverflow.com/questions/2016901/viewing-unpushed-git-commits/30720302
 
+const nopt = require('nopt');
+const assert = require('assert');
 const async = require('async');
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
 const os = require('os');
-const args = process.argv.slice(2);
-const $path = path.resolve(args[0] || process.cwd());
-const force = args.indexOf('--force') > -1;
 const gitPaths = [];
 
+
+const knownOpts = Object.freeze({
+    force: Boolean
+});
+
+const shortHands = Object.freeze({
+    f: ['--force']
+});
+
+
+const parsedArgs = nopt(knownOpts, shortHands, process.argv, 2);
+
+console.log(parsedArgs);
+
+const force = parsedArgs.force;
 
 function endsWith(str, suffix) {
     return str.indexOf(suffix, str.length - suffix.length) !== -1;
 }
 
-(function recurse(dir) {
+const paths = [];
 
-    var stat;
+try{
+    assert(parsedArgs.argv.remain.length > 0,'No file path(s) provided.');
+    paths.push.apply(paths,parsedArgs.argv.remain);
+}
+catch(err){
+    console.log('Using current working directory.');
+    paths.push(process.cwd());
+}
 
-    fs.readdirSync(dir).forEach(function (item) {
+paths.map(function(p){
 
-        item = path.resolve(path.normalize(dir + '/' + item));
+    return p && path.resolve(path.normalize(p));
 
-        if (endsWith(item, '.git')) {
-            gitPaths.push(item);
-        }
-        else {
-            stat = fs.statSync(item);
-            if (stat.isDirectory()) {
-                recurse(item);
+}).filter(function(p){
+
+    return p && path.isAbsolute(p);
+
+}).forEach(function($path,index){
+
+    console.log('$path:',$path);
+
+    (function recurse(dir) {
+
+        var stat;
+
+        fs.readdirSync(dir).forEach(function (item) {
+
+            item = path.resolve(path.normalize(dir + '/' + item));
+
+            if (endsWith(item, '.git')) {
+                gitPaths.push(item);
             }
-        }
+            else {
+                stat = fs.statSync(item);
+                if (stat.isDirectory()) {
+                    recurse(item);
+                }
+            }
 
-    });
+        });
 
-})($path);
+    })($path);
+
+});
+
+
 
 
 async.map(gitPaths, function (item, cb) {
@@ -49,14 +91,14 @@ async.map(gitPaths, function (item, cb) {
 
     var command;
 
-    if(force){
+    if (force) {
 
         if (os.platform() === 'win32') {
             command = 'cd ' + path.normalize(item);
         }
         else {
-            //command = 'cd ' + path.normalize(item) + ' && git add . && git add -A && git commit -am "auto-commit" && git push';
-            command = 'cd ' + path.normalize(item) + ' && git log @{u}..';
+            command = 'cd ' + path.normalize(item) + ' && git add . && git add -A && git commit -am "auto-commit" && git push';
+            //command = 'cd ' + path.normalize(item) + ' && git log @{u}..';
         }
 
         cp.exec(command, {}, function (err, data) {
@@ -65,7 +107,7 @@ async.map(gitPaths, function (item, cb) {
                 cb(null);
             }
             else {
-                console.log('data:',data);
+                console.log('data:', data);
                 var result = String(data).match(/^\s/);
                 if (result) {
                     cb(null, orig);
@@ -77,7 +119,7 @@ async.map(gitPaths, function (item, cb) {
         });
 
     }
-    else{
+    else {
         if (os.platform() === 'win32') {
             command = 'cd ' + path.normalize(item);
         }
@@ -112,17 +154,17 @@ async.map(gitPaths, function (item, cb) {
         results.filter(function (item) {
             return item && String(item).length > 0;
         }).forEach(function (item) {
-            if(allGood){
+            if (allGood) {
                 allGood = false;
                 console.log('\nNostos: The following git repos have uncommitted material.');
             }
             console.log(' => ', item);
         });
-        if(allGood){
-            console.log('\nGiven the following path: '+ $path);
+        if (allGood) {
+            console.log('\nGiven the following path: ' + $path);
             console.log('We searched all directories below, and not one git repo has uncommitted code, you are all good.\n');
         }
-        else{
+        else {
             console.log('\n');
         }
     }
