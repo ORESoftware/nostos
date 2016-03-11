@@ -211,7 +211,7 @@ async.map(gitPaths, function (item, cb) {
                     }
                 });
             }
-            else if(force){
+            else if(force){  //
                 cb(null, results);
             }
             else if (runPush) {
