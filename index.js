@@ -109,9 +109,9 @@ async.map(gitPaths, function (item, cb) {
                         console.log('stdout git log --oneline:', stdout);
                         console.log('stderr git log --oneline:', stderr);
                         var result = String(stdout).match(/\S/); //match any non-whitespace
-                        var error = String(stderr).match(/\S/); //match any non-whitespace
+                        var error = String(stderr).match(/Error/i);
                         if (error) {
-                            cb(stderr);
+                            cb(null, {error: stderr});
                         }
                         else if (result) {
                             cb(null, orig);
@@ -134,10 +134,10 @@ async.map(gitPaths, function (item, cb) {
                         console.log('stdout status short:', stdout);
                         console.log('stderr status short:', stderr);
                         var result = String(stdout).match(/\S/); //match any non-whitespace
-                        var error = String(stderr).match(/\S/); //match any non-whitespace
+                        var error = String(stderr).match(/Error/i);
 
                         if (error) {
-                            cb(stderr);
+                            cb(null, {error: stderr});
                         }
                         else if (result) {
                             cb(null, orig);
@@ -172,12 +172,15 @@ async.map(gitPaths, function (item, cb) {
                             cb(null);
                         }
                         else {
-                            console.log('stdout:', stdout);
+                            console.log('stdout:', stdout);   //TODO: if no upstream is defined, does stdout or stderr show "error" or "Error"??
                             console.log('stderr:', stderr);
                             const error1 = String(stdout).match(/Error/i);
                             const error2 = String(stderr).match(/Error/i);
                             if (error1 || error2) {
-                                cb(null, orig);
+                                cb(null, {
+                                    root: orig,
+                                    error: (stdout + '\n' + stderr)
+                                });
                             }
                             else {
                                 cb(null);
@@ -193,11 +196,10 @@ async.map(gitPaths, function (item, cb) {
 
 
     }
-    else {
+    else {  //
 
         var c = os.platform() === 'win32' ? 'cd ' + path.normalize(orig) :
         'cd ' + path.normalize(orig) + ' && git status --short';
-
 
         cp.exec(c, {}, function (err, stdout, stderr) {
             if (err) {
@@ -207,10 +209,13 @@ async.map(gitPaths, function (item, cb) {
                 const result = String(stdout).match(/\S/); //match any non-whitespace
                 const error = String(stderr).match(/Error/i); //match any non-whitespace
                 if (error) {
-                    cb(err);
+                    cb(null, {
+                        error: error,
+                        root: orig
+                    });
                 }
                 if (result) {
-                    cb(null, orig);
+                    cb(null, {root: orig});
                 }
                 else {
                     cb(null);
