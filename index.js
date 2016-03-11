@@ -52,9 +52,7 @@ catch (err) {
 }
 
 paths = paths.map(function (p) {
-
     return p && path.resolve(path.normalize(p));
-
 });
 
 paths.filter(function (p) {
@@ -248,7 +246,14 @@ async.map(gitPaths, function (item, cb) {
 
 }, function complete(err, results) {
     if (err) {
-        console.error('NOSTOS error:\n', err);  //is the sudo error here
+
+         if(String(err).match(/insufficient permission/i)){
+             console.error('\nInsufficient permission to run git commands, try sudo.\n');
+         }
+        else{
+             console.error('Unexpected error:\n', err);  //is the sudo error here
+         }
+
     }
     else {
         debug('Results => \n', results);
