@@ -64,7 +64,7 @@ paths.map(function (p) {
             item = path.resolve(path.normalize(dir + '/' + item));
 
             if (endsWith(item, '.git')) {
-                gitPaths.push(item);
+                gitPaths.push(item);  //we stop recursion if we hit first .git dir on a path
             }
             else {
                 stat = fs.statSync(item);
@@ -84,7 +84,7 @@ console.log('gitpaths =', gitPaths);
 
 async.map(gitPaths, function (item, cb) {
 
-    const orig = String(path.normalize(path.resolve(item + '/../')));
+    const orig = String(path.normalize(path.resolve(item + '/../')));  //sink one directory
 
     var $cwd;
 
@@ -137,10 +137,15 @@ async.map(gitPaths, function (item, cb) {
                         var error = String(stderr).match(/Error/i);
 
                         if (error) {
-                            cb(null, {error: stderr});
+                            cb(null, {
+                                error: stderr,
+                                root: orig
+                            });
                         }
                         else if (result) {
-                            cb(null, orig);
+                            cb(null, {
+                                root: orig
+                            });
                         }
                         else {
                             cb(null);
