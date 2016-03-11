@@ -195,21 +195,20 @@ async.map(gitPaths, function (item, cb) {
     }
     else {
 
-        var command;
+        var c = os.platform() === 'win32' ? 'cd ' + path.normalize(orig) :
+        'cd ' + path.normalize(orig) + ' && git status --short';
 
-        if (os.platform() === 'win32') {
-            command = 'cd ' + path.normalize(item);
-        }
-        else {
-            command = 'cd ' + path.normalize(item) + ' && git status --short';
-        }
 
-        cp.exec(command, {}, function (err, data) {
+        cp.exec(c, {}, function (err, stdout, stderr) {
             if (err) {
                 cb(err);
             }
             else {
-                var result = String(data).match(/\S/); //match any non-whitespace
+                const result = String(stdout).match(/\S/); //match any non-whitespace
+                const error = String(stderr).match(/Error/i); //match any non-whitespace
+                if (error) {
+                    cb(err);
+                }
                 if (result) {
                     cb(null, orig);
                 }
@@ -226,12 +225,14 @@ async.map(gitPaths, function (item, cb) {
         console.log(err);
     }
     else {
-
         console.log('Results:', results);
 
         var allGood = true;
+
         results.filter(function (item) {
+
             return item && String(item).length > 0;
+
         }).forEach(function (item) {
             if (allGood) {
                 allGood = false;
@@ -239,6 +240,7 @@ async.map(gitPaths, function (item, cb) {
             }
             console.log(' => ', item);
         });
+
         if (allGood) {
             console.log('\nGiven the following path(s): ' + paths);
             console.log('We searched all directories below, and not one git repo has uncommitted code, you are all good.\n');
