@@ -277,7 +277,7 @@ async.map(gitPaths, function (item, cb) {
         }
         else {
             console.log('\n');
-        }
+        }//
     }
 
 });
