@@ -228,7 +228,8 @@ async.map(gitPaths, function (item, cb) {
             }
             else if (force) {  //
                 cb(null, {
-                    push: null
+                    push: null,
+                    root: orig
                 });
             }
             else if (runPush) {
