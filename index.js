@@ -248,7 +248,7 @@ async.map(gitPaths, function (item, cb) {
 }, function complete(err, results) {
     if (err) {
          if(String(err).match(/insufficient permission/i)){
-             console.error('\nInsufficient permission to run git commands, try sudo.\n');
+             console.error('\nInsufficient permission to run git commands, try sudo, and LOL have fun typing in your password for the 100th time this week.\n');
          }
         else{
              console.error('Unexpected error:\n', err);  //is the sudo error here
