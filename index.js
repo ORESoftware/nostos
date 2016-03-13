@@ -12,10 +12,8 @@ const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
 const os = require('os');
-const debug = require('debug')('nostos:core');
 const colors = require('colors/safe');
 const _ = require('lodash');
-
 
 const gitPaths = [];
 
@@ -32,9 +30,11 @@ const shortHands = Object.freeze({
 
 const parsedArgs = nopt(knownOpts, shortHands, process.argv, 2);
 
-debug(parsedArgs);
-
+// user defined args
 const force = parsedArgs.force;
+
+
+/////////
 
 function endsWith(str, suffix) {
     return str.indexOf(suffix, str.length - suffix.length) !== -1;
@@ -47,7 +47,8 @@ try {
     paths.push.apply(paths, parsedArgs.argv.remain);
 }
 catch (err) {
-    //console.log('nostos cmd utility is using your current working directory, b/c you did not pass in a path.');
+    //nostos cmd utility is using your current working directory, b/c you did not pass in a path
+    //TODO should verify with user to use CWD to search?
     paths.push(process.cwd());
 }
 
@@ -61,7 +62,7 @@ paths.filter(function (p) {
 
 }).forEach(function ($path, index) {
 
-    debug('index =>' + index + ', path =>' + $path);
+    console.log('index =>' + index + ', path =>' + $path);
 
     (function recurse(dir) {
 
@@ -81,7 +82,6 @@ paths.filter(function (p) {
                         recurse(item);
                     }
                 }
-
             });
         }
         catch (err) {
@@ -93,7 +93,7 @@ paths.filter(function (p) {
 });
 
 
-debug('gitpaths => \n' + gitPaths);
+console.log('gitpaths => \n' + gitPaths);
 
 if (gitPaths.length < 1) {
     console.log('\n', colors.magenta('Warning => No git projects found given the root path(s) used =>'), '\n', colors.grey(paths.map(p => '"' + p + '"' + '\n')), '\n');
@@ -115,8 +115,8 @@ async.map(gitPaths, function (item, cb) {
 
     async.parallel([
         function (cb) {
-            const c = ('git log --oneline origin/master..HEAD');
-            cp.exec(c, {cwd: $cwd}, function (err, stdout, stderr) {
+            const cmd = ('git log --oneline origin/master..HEAD');
+            cp.exec(cmd, {cwd: $cwd}, function (err, stdout, stderr) {
                 if (err) {
                     cb(err);
                 }
@@ -148,8 +148,8 @@ async.map(gitPaths, function (item, cb) {
 
         },
         function (cb) {
-            const c = ('git status --short');
-            cp.exec(c, {cwd: $cwd}, function (err, stdout, stderr) {
+            const cmd = ('git status --short');
+            cp.exec(cmd, {cwd: $cwd}, function (err, stdout, stderr) {
                 if (err) {
                     cb(err);
                 }
@@ -190,7 +190,7 @@ async.map(gitPaths, function (item, cb) {
         else {
 
             var runPush = false;
-            results = results.filter(function (item) {
+            results.filter(function (item) {
                 return item;
             }).forEach(function () {
                 runPush = true;
@@ -205,8 +205,7 @@ async.map(gitPaths, function (item, cb) {
                         cb(err);
                     }
                     else {
-                        debug('\nrun push stdout:\n' + stdout);   //TODO: if no upstream is defined, does stdout or stderr show "error" or "Error"??
-                        debug('\nrun push stderr:\n' + stderr);
+                        //TODO: if no upstream is defined, does stdout or stderr show "error" or "Error"??
                         const error1 = String(stdout).match(/Error/i);
                         const error2 = String(stderr).match(/Error/i);
                         if (error1 || error2) {
@@ -234,6 +233,7 @@ async.map(gitPaths, function (item, cb) {
             }
             else if (runPush) {
                 cb(null, {
+                    push: null,
                     root: orig,
                     git: 'run-all'
                 });
@@ -247,17 +247,15 @@ async.map(gitPaths, function (item, cb) {
 
 }, function complete(err, results) {
     if (err) {
-
          if(String(err).match(/insufficient permission/i)){
              console.error('\nInsufficient permission to run git commands, try sudo.\n');
          }
         else{
              console.error('Unexpected error:\n', err);  //is the sudo error here
          }
-
     }
     else {
-        debug('Results => \n', results);
+        console.log('Results => \n', results);
 
         var allGood = true;
 
