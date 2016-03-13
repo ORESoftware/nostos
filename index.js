@@ -56,9 +56,19 @@ paths = paths.map(function (p) {
     return p && path.resolve(path.normalize(p));
 });
 
+var t = Date.now();
+console.log('time before:', t);
+
 paths.filter(function (p) {
 
-    return p && path.isAbsolute(p);
+    try{
+        return fs.statSync(p) && path.isAbsolute(p);
+        //return fs.statSync(p);
+    }
+    catch(err){
+        console.log('\n', 'The following path was assumed to be a directory but it is not valid =>', '\n', colors.grey(p));
+    }
+
 
 }).forEach(function ($path, index) {
 
@@ -66,32 +76,58 @@ paths.filter(function (p) {
 
     (function recurse(dir) {
 
+        if(String(dir).match(/node_modules/)){
+            return;
+        }
+
+        console.log('dir:', dir);
+
         var stat;
+        try{
+            stat = fs.statSync(path.resolve(dir));
+        }
+        catch(err){
+            return;
+        }
+
+        if(!stat.isDirectory()){
+            return;
+        }
 
         try {
-            fs.readdirSync(dir).forEach(function (item) {
+            stat = fs.statSync(path.resolve(dir + '/.git'));
 
-                item = path.resolve(path.normalize(dir + '/' + item));
-
-                if (endsWith(item, '.git')) {
-                    gitPaths.push(item);  //we stop recursion if we hit first .git dir on a path
-                }
-                else {
+            if (stat.isDirectory()) {  //TODO: sometimes .git is a file
+                gitPaths.push(dir);  //we stop recursion if we hit first .git dir on a path
+            }
+            else {
+                fs.readdirSync(dir).forEach(function (item) {
+                    item = path.resolve(path.normalize(dir + '/' + item));
                     stat = fs.statSync(item);
                     if (stat.isDirectory()) {
                         recurse(item);
                     }
-                }
-            });
+                });
+            }
+
         }
         catch (err) {
-            console.log('\n', 'The following path was assumed to be a directory but it is not valid =>', '\n', colors.grey(dir));
+
+            fs.readdirSync(dir).forEach(function (item) {
+                item = path.resolve(path.normalize(dir + '/' + item));
+                stat = fs.statSync(item);
+                if (stat.isDirectory()) {
+                    recurse(item);
+                }
+            });
         }
 
     })($path);
 
 });
 
+
+console.log('time after:', Date.now() - t);
 
 console.log('gitpaths => \n' + gitPaths);
 
@@ -132,7 +168,7 @@ async.map(gitPaths, function (item, cb) {
                             }
                             var result = String(stdout).match(/###/); //match any non-whitespace
                             var branch, remote, data;
-                            if(result){
+                            if (result) {
                                 result = String(stdout).split('###');
                                 var name = result[0].trim().split(/\s/);
                                 branch = name[name.length - 1].trim();
