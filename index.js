@@ -34,12 +34,6 @@ const parsedArgs = nopt(knownOpts, shortHands, process.argv, 2);
 const force = parsedArgs.force;
 
 
-/////////
-
-function endsWith(str, suffix) {
-    return str.indexOf(suffix, str.length - suffix.length) !== -1;
-}
-
 var paths = [];
 
 try {
@@ -61,11 +55,10 @@ console.log('time before:', t);
 
 paths.filter(function (p) {
 
-    try{
+    try {
         return fs.statSync(p) && path.isAbsolute(p);
-        //return fs.statSync(p);
     }
-    catch(err){
+    catch (err) {
         console.log('\n', 'The following path was assumed to be a directory but it is not valid =>', '\n', colors.grey(p));
     }
 
@@ -76,49 +69,42 @@ paths.filter(function (p) {
 
     (function recurse(dir) {
 
-        if(String(dir).match(/node_modules/)){
+        if (String(dir).match(/node_modules/)) {
             return;
         }
 
-        console.log('dir:', dir);
+        //console.log('dir:', dir);
 
-        var stat;
-        try{
+        var stat, p;
+
+        try {
             stat = fs.statSync(path.resolve(dir));
         }
-        catch(err){
+        catch (err) {
             return;
         }
 
-        if(!stat.isDirectory()){
+        if (!stat.isDirectory()) {
             return;
         }
 
         try {
-            stat = fs.statSync(path.resolve(dir + '/.git'));
+            p = path.resolve(dir + path.sep + '.git');
+            stat = fs.statSync(p);
 
             if (stat.isDirectory()) {  //TODO: sometimes .git is a file
-                gitPaths.push(dir);  //we stop recursion if we hit first .git dir on a path
+                gitPaths.push(path.normalize(p));  //we stop recursion if we hit first .git dir on a path
             }
             else {
                 fs.readdirSync(dir).forEach(function (item) {
-                    item = path.resolve(path.normalize(dir + '/' + item));
-                    stat = fs.statSync(item);
-                    if (stat.isDirectory()) {
-                        recurse(item);
-                    }
+                    recurse(path.resolve(path.normalize(dir + '/' + item)));
                 });
             }
 
         }
         catch (err) {
-
             fs.readdirSync(dir).forEach(function (item) {
-                item = path.resolve(path.normalize(dir + '/' + item));
-                stat = fs.statSync(item);
-                if (stat.isDirectory()) {
-                    recurse(item);
-                }
+                recurse(path.resolve(path.normalize(dir + '/' + item)));
             });
         }
 
@@ -128,8 +114,8 @@ paths.filter(function (p) {
 
 
 console.log('time after:', Date.now() - t);
-
-console.log('gitpaths => \n' + gitPaths);
+console.log('gitpaths =>');
+gitPaths.forEach(item => console.log(item));
 
 if (gitPaths.length < 1) {
     console.log('\n', colors.magenta('Warning => No git projects found given the root path(s) used =>'), '\n', colors.grey(paths.map(p => '"' + p + '"' + '\n')), '\n');
