@@ -375,7 +375,7 @@ async.map(gitPaths, function (item, cb) {
             if (item.error) {
                 allGood = false;
                 console.log('\nNostos: The following project roots git errors.');
-                console.log(' => ', JSON.stringify(item.root), '\n');
+                console.log(' => ', JSON.stringify(item.root), '\n', item.error);
             }
             else if (item.push === null) {
                 console.log('\nNostos: The following project experienced no errors, but were not pushed.');
