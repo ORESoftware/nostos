@@ -369,10 +369,12 @@ async.map(gitPaths, function (item, cb) {
         console.log('Results => \n', results);
 
         var allGood = true;
+        var noErrors = true;
 
         results.forEach(function (item) {
 
             if (item.error) {
+                noErrors = false;
                 allGood = false;
                 console.log('\nNostos: The following project roots git errors.');
                 console.log(' => ', JSON.stringify(item.root), '\n', item.error);
@@ -410,8 +412,11 @@ async.map(gitPaths, function (item, cb) {
                     console.log(colors.blue(p), '\n');
                 })
             }
+            if (noErrors) {
+                console.log('\n', 'All git repos with uncommitted/unpushed code were successfully pushed.');
+            }
             else {
-                console.log('All git repos with uncommitted/unpushed code were successfully pushed.');
+                console.log('\n', 'At least one of your commands experienced errors.');
             }
         }
         else {
