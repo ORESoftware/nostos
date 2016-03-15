@@ -416,7 +416,7 @@ async.map(gitPaths, function (item, cb) {
                 console.log('\n', 'All git repos with uncommitted/unpushed code were successfully pushed.');
             }
             else {
-                console.log('\n', 'At least one of your commands experienced errors.');
+                console.log('\n', 'At least one of your commands experienced errors. You may need to configure SSH with Github.');
             }
         }
         else {
