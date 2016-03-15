@@ -301,8 +301,12 @@ async.map(gitPaths, function (item, cb) {
                 const cmd = 'git add . && git add -A && git commit -am "auto-commit" && git push';
                 cp.exec(cmd, {cwd: $cwd}, function (err, stdout, stderr) {
                     if (err) {
-                        err.root = orig;
-                        cb(err);
+                        cb(null, {
+                            error: err,
+                            root: orig,
+                            git: 'run-all',
+                            push: false
+                        });
                     }
                     else {
                         //TODO: if no upstream is defined, does stdout or stderr show "error"/"Error"??
@@ -357,7 +361,8 @@ async.map(gitPaths, function (item, cb) {
             console.error('\nInsufficient permission to run git commands, try sudo.\n');
         }
         else {
-            console.error('Unexpected error, most likely at path=', err.root, '\n', err);  //is the sudo error here
+            console.error('Unexpected error, most likely at path=', err.root, '\n', err,
+                '\n', 'probable reason is that you don\'t have push rights without logging in.');  //is the sudo error here
         }
     }
     else {
@@ -365,10 +370,7 @@ async.map(gitPaths, function (item, cb) {
 
         var allGood = true;
 
-        results.filter(function (item) {
-            return item && String(item).length > 0;
-
-        }).forEach(function (item) {
+        results.forEach(function (item) {
 
             if (item.error) {
                 allGood = false;
