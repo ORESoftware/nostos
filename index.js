@@ -22,13 +22,13 @@ const knownOpts = Object.freeze({
     verbose: Boolean
 });
 
-const shortHands = Object.freeze({
+const shorthands = Object.freeze({
     f: ['--force'],
     v: ['--verbose']
 });
 
 
-const parsedArgs = nopt(knownOpts, shortHands, process.argv, 2);
+const parsedArgs = nopt(knownOpts, shorthands, process.argv, 2);
 
 // user defined args
 const force = parsedArgs.force;
@@ -62,7 +62,6 @@ paths.filter(function (p) {
         console.log('\n', 'The following path was assumed to be a directory but it is not valid =>', '\n', colors.grey(p));
     }
 
-
 }).forEach(function ($path, index) {
 
     console.log('index =>' + index + ', path =>' + $path);
@@ -88,6 +87,12 @@ paths.filter(function (p) {
             return;
         }
 
+        function continueRecursion() {
+            fs.readdirSync(dir).forEach(function (item) {
+                recurse(path.resolve(path.normalize(dir + path.sep + item)));
+            });
+        }
+
         try {
             p = path.resolve(dir + path.sep + '.git');
             stat = fs.statSync(p);
@@ -96,16 +101,11 @@ paths.filter(function (p) {
                 gitPaths.push(path.normalize(p));  //we stop recursion if we hit first .git dir on a path
             }
             else {
-                fs.readdirSync(dir).forEach(function (item) {
-                    recurse(path.resolve(path.normalize(dir + '/' + item)));
-                });
+                continueRecursion();
             }
-
         }
         catch (err) {
-            fs.readdirSync(dir).forEach(function (item) {
-                recurse(path.resolve(path.normalize(dir + '/' + item)));
-            });
+            continueRecursion();
         }
 
     })($path);
@@ -199,16 +199,23 @@ async.map(gitPaths, function (item, cb) {
                                 cb(null, {
                                     error: stderr,
                                     root: orig,
-                                    git: 'push'
+                                    git: 'push-status',
+                                    result: null
                                 });
                             }
-                            else if (result) {
+                            else if (result) {  //we have an unpushed status
                                 cb(null, {
-                                    root: orig
+                                    root: orig,
+                                    git: 'push-status',
+                                    result: stdout
                                 });
                             }
                             else {
-                                cb(null);
+                                cb(null, {
+                                    root: orig,
+                                    git: 'push-status',
+                                    result: null
+                                });
                             }
                         }
                     });
@@ -234,7 +241,8 @@ async.map(gitPaths, function (item, cb) {
                 if (err) {
                     cb(null, {
                         git: 'commit',
-                        error: err
+                        error: err,
+                        result: null
                     });
                 }
                 else {
@@ -244,24 +252,29 @@ async.map(gitPaths, function (item, cb) {
                         console.log(stderr);
                     }
                     var result = String(stdout).match(/\S/); //match any non-whitespace
-                    var error = String(stderr).match(/Error/i);
+                    var error = String(stderr).match(/Error/i); //sometimes there is just a warning...
 
                     if (error) {
                         cb(null, {
-                            git: 'commit',
+                            git: 'commit-status',
                             stderr: stderr,
-                            root: orig
+                            root: orig,
+                            result: null
                         });
                     }
                     else if (result) {   // result means there is uncommitted code
                         cb(null, {
-                            git: 'commit',
+                            git: 'commit-status',
                             root: orig,
                             result: result
                         });
                     }
                     else {
-                        cb(null);
+                        cb(null, {
+                            git: 'commit-status',
+                            root: orig,
+                            result: null
+                        });
                     }
                 }
             });
@@ -276,22 +289,22 @@ async.map(gitPaths, function (item, cb) {
         else {
 
             var runPush = false;
+
             results.filter(function (item) {
-                return item;
+                return item.result;   //note: result is defined if there is uncommitted or unpushed code
             }).forEach(function () {
                 runPush = true;
             });
 
             if (force && runPush) {
 
-                const c = 'git add . && git add -A && git commit -am "auto-commit" && git push';
-                cp.exec(c, {cwd: $cwd}, function (err, stdout, stderr) {
+                const cmd = 'git add . && git add -A && git commit -am "auto-commit" && git push';
+                cp.exec(cmd, {cwd: $cwd}, function (err, stdout, stderr) {
                     if (err) {
-                        console.error(err);
                         cb(err);
                     }
                     else {
-                        //TODO: if no upstream is defined, does stdout or stderr show "error" or "Error"??
+                        //TODO: if no upstream is defined, does stdout or stderr show "error"/"Error"??
                         const error1 = String(stdout).match(/Error/i);
                         const error2 = String(stderr).match(/Error/i);
                         if (error1 || error2) {
@@ -304,17 +317,19 @@ async.map(gitPaths, function (item, cb) {
                         }
                         else {
                             cb(null, {
+                                root: orig,
                                 push: true,
-                                root: orig
+                                git: 'run-all'
                             });
                         }
                     }
                 });
             }
-            else if (force) {  //
+            else if (force) {
                 cb(null, {
                     push: null,
-                    root: orig
+                    root: orig,
+                    git: 'run-all'
                 });
             }
             else if (runPush) {
@@ -325,7 +340,11 @@ async.map(gitPaths, function (item, cb) {
                 });
             }
             else {
-                cb(null);
+                cb(null, {
+                    root: orig,
+                    push: null,
+                    git: 'run-all'
+                });
             }
         }
     });
@@ -334,7 +353,7 @@ async.map(gitPaths, function (item, cb) {
 }, function complete(err, results) {
     if (err) {
         if (String(err).match(/insufficient permission/i)) {
-            console.error('\nInsufficient permission to run git commands, try sudo, and LOL have fun typing in your password for the 100th time this week.\n');
+            console.error('\nInsufficient permission to run git commands, try sudo.\n');
         }
         else {
             console.error('Unexpected error:\n', err);  //is the sudo error here
@@ -346,7 +365,6 @@ async.map(gitPaths, function (item, cb) {
         var allGood = true;
 
         results.filter(function (item) {
-
             return item && String(item).length > 0;
 
         }).forEach(function (item) {
