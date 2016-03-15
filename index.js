@@ -284,7 +284,7 @@ async.map(gitPaths, function (item, cb) {
 
         if (err) {
             console.error(err);
-            cb(null);
+            cb(err);
         }
         else {
 
@@ -301,6 +301,7 @@ async.map(gitPaths, function (item, cb) {
                 const cmd = 'git add . && git add -A && git commit -am "auto-commit" && git push';
                 cp.exec(cmd, {cwd: $cwd}, function (err, stdout, stderr) {
                     if (err) {
+                        err.root = orig;
                         cb(err);
                     }
                     else {
@@ -356,7 +357,7 @@ async.map(gitPaths, function (item, cb) {
             console.error('\nInsufficient permission to run git commands, try sudo.\n');
         }
         else {
-            console.error('Unexpected error:\n', err);  //is the sudo error here
+            console.error('Unexpected error, most likely at path=', err.root, '\n', err);  //is the sudo error here
         }
     }
     else {
