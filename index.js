@@ -12,10 +12,8 @@ const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
 const os = require('os');
-const debug = require('debug')('nostos:core');
 const colors = require('colors/safe');
 const _ = require('lodash');
-
 
 const gitPaths = [];
 
@@ -24,21 +22,17 @@ const knownOpts = Object.freeze({
     verbose: Boolean
 });
 
-const shortHands = Object.freeze({
+const shorthands = Object.freeze({
     f: ['--force'],
     v: ['--verbose']
 });
 
 
-const parsedArgs = nopt(knownOpts, shortHands, process.argv, 2);
+const parsedArgs = nopt(knownOpts, shorthands, process.argv, 2);
 
-debug(parsedArgs);
-
+// user defined args
 const force = parsedArgs.force;
 
-function endsWith(str, suffix) {
-    return str.indexOf(suffix, str.length - suffix.length) !== -1;
-}
 
 var paths = [];
 
@@ -47,7 +41,8 @@ try {
     paths.push.apply(paths, parsedArgs.argv.remain);
 }
 catch (err) {
-    //console.log('nostos cmd utility is using your current working directory, b/c you did not pass in a path.');
+    //nostos cmd utility is using your current working directory, b/c you did not pass in a path
+    //TODO should verify with user to use CWD to search?
     paths.push(process.cwd());
 }
 
@@ -55,37 +50,62 @@ paths = paths.map(function (p) {
     return p && path.resolve(path.normalize(p));
 });
 
+var t = Date.now();
+console.log('time before:', t);
+
 paths.filter(function (p) {
 
-    return p && path.isAbsolute(p);
+    try {
+        return fs.statSync(p) && path.isAbsolute(p);
+    }
+    catch (err) {
+        console.log('\n', 'The following path was assumed to be a directory but it is not valid =>', '\n', colors.grey(p));
+    }
 
 }).forEach(function ($path, index) {
 
-    debug('index =>' + index + ', path =>' + $path);
+    console.log('index =>' + index + ', path =>' + $path);
 
     (function recurse(dir) {
 
-        var stat;
+        if (String(dir).match(/node_modules/)) {
+            return;
+        }
+
+        //console.log('dir:', dir);
+
+        var stat, p;
 
         try {
-            fs.readdirSync(dir).forEach(function (item) {
-
-                item = path.resolve(path.normalize(dir + '/' + item));
-
-                if (endsWith(item, '.git')) {
-                    gitPaths.push(item);  //we stop recursion if we hit first .git dir on a path
-                }
-                else {
-                    stat = fs.statSync(item);
-                    if (stat.isDirectory()) {
-                        recurse(item);
-                    }
-                }
-
-            });
+            stat = fs.statSync(path.resolve(dir));
         }
         catch (err) {
-            console.log('\n', 'The following path was assumed to be a directory but it is not valid =>', '\n', colors.grey(dir));
+            return;
+        }
+
+        if (!stat.isDirectory()) {
+            return;
+        }
+
+        function continueRecursion() {
+            fs.readdirSync(dir).forEach(function (item) {
+                recurse(path.resolve(path.normalize(dir + path.sep + item)));
+            });
+        }
+
+        try {
+            p = path.resolve(dir + path.sep + '.git');
+            stat = fs.statSync(p);
+
+            if (stat.isDirectory()) {  //TODO: sometimes .git is a file
+                gitPaths.push(path.normalize(p));  //we stop recursion if we hit first .git dir on a path
+            }
+            else {
+                continueRecursion();
+            }
+        }
+        catch (err) {
+            continueRecursion();
         }
 
     })($path);
@@ -93,7 +113,9 @@ paths.filter(function (p) {
 });
 
 
-debug('gitpaths => \n' + gitPaths);
+console.log('time after:', Date.now() - t);
+console.log('gitpaths =>');
+gitPaths.forEach(item => console.log(item));
 
 if (gitPaths.length < 1) {
     console.log('\n', colors.magenta('Warning => No git projects found given the root path(s) used =>'), '\n', colors.grey(paths.map(p => '"' + p + '"' + '\n')), '\n');
@@ -115,43 +137,113 @@ async.map(gitPaths, function (item, cb) {
 
     async.parallel([
         function (cb) {
-            const c = ('git log --oneline origin/master..HEAD');
-            cp.exec(c, {cwd: $cwd}, function (err, stdout, stderr) {
+            async.waterfall([
+                function (cb) {
+                    const cmd = ('git branch & echo ### & git rev-parse --abbrev-ref --symbolic-full-name @{u}'); //
+                    cp.exec(cmd, {cwd: $cwd}, function (err, stdout, stderr) {
+                        if (err) {
+                            cb(null, {
+                                error: err
+                            });
+                        }
+                        else {
+                            if (parsedArgs.verbose) {
+                                console.log(colors.cyan('Git repo current branch and upstream branch:'));
+                                console.log(stdout);
+                                console.log(stderr);
+                            }
+                            var result = String(stdout).match(/###/); //match any non-whitespace
+                            var branch, remote, data;
+                            if (result) {
+                                result = String(stdout).split('###');
+                                var name = result[0].trim().split(/\s/);
+                                branch = name[name.length - 1].trim();
+                                remote = result[1].trim();
+                            }
+                            var error = String(stderr).match(/Error/i);
+                            if (error) {
+                                cb(null, {
+                                    error: stderr,
+                                    root: orig,
+                                    git: 'push'
+                                });
+                            }
+                            else if (result) {
+                                cb(null, remote);
+                            }
+                            else {
+                                cb(null, {
+                                    error: 'no result from git cmd'
+                                });
+                            }
+                        }
+                    });
+                },
+                function (data, cb) {
+                    const cmd = ('git log --oneline ' + data + '..HEAD');   //git log --oneline origin/master..HEAD
+                    cp.exec(cmd, {cwd: $cwd}, function (err, stdout, stderr) {
+                        if (err) {
+                            cb(null, {
+                                error: err
+                            });
+                        }
+                        else {
+                            if (parsedArgs.verbose) {
+                                console.log(colors.cyan('Git repo push status:'));
+                                console.log(stdout);
+                                console.log(stderr);
+                            }
+                            var result = String(stdout).match(/\S/); //match any non-whitespace
+                            var error = String(stderr).match(/Error/i);
+                            if (error) {
+                                cb(null, {
+                                    error: stderr,
+                                    root: orig,
+                                    git: 'push-status',
+                                    result: null
+                                });
+                            }
+                            else if (result) {  //we have an unpushed status
+                                cb(null, {
+                                    root: orig,
+                                    git: 'push-status',
+                                    result: stdout
+                                });
+                            }
+                            else {
+                                cb(null, {
+                                    root: orig,
+                                    git: 'push-status',
+                                    result: null
+                                });
+                            }
+                        }
+                    });
+                }
+            ], function complete(err, result) {
                 if (err) {
-                    cb(err);
+                    cb(null, {
+                        error: err
+                    });
                 }
                 else {
-                    if (parsedArgs.verbose) {
-                        console.log(colors.cyan('Git repo push status:'));
-                        console.log(stdout);
-                        console.log(stderr);
-                    }
-                    var result = String(stdout).match(/\S/); //match any non-whitespace
-                    var error = String(stderr).match(/Error/i);
-                    if (error) {
-                        cb(null, {
-                            error: stderr,
-                            root: orig,
-                            git: 'push'
-                        });
-                    }
-                    else if (result) {
-                        cb(null, {
-                            root: orig
-                        });
-                    }
-                    else {
-                        cb(null);
-                    }
+                    cb(null, {
+                        result: result
+                    });
                 }
+
             });
 
         },
         function (cb) {
-            const c = ('git status --short');
-            cp.exec(c, {cwd: $cwd}, function (err, stdout, stderr) {
+            const cmd = ('git status --short');
+            cp.exec(cmd, {cwd: $cwd}, function (err, stdout, stderr) {
                 if (err) {
-                    cb(err);
+                    cb(null, {
+                        git: 'commit',
+                        error: err,
+                        result: null
+                    });
                 }
                 else {
                     if (parsedArgs.verbose) {
@@ -160,22 +252,29 @@ async.map(gitPaths, function (item, cb) {
                         console.log(stderr);
                     }
                     var result = String(stdout).match(/\S/); //match any non-whitespace
-                    var error = String(stderr).match(/Error/i);
+                    var error = String(stderr).match(/Error/i); //sometimes there is just a warning...
 
                     if (error) {
                         cb(null, {
-                            git: 'commit',
-                            error: stderr,
-                            root: orig
+                            git: 'commit-status',
+                            stderr: stderr,
+                            root: orig,
+                            result: null
                         });
                     }
-                    else if (result) {
+                    else if (result) {   // result means there is uncommitted code
                         cb(null, {
-                            root: orig
+                            git: 'commit-status',
+                            root: orig,
+                            result: result
                         });
                     }
                     else {
-                        cb(null);
+                        cb(null, {
+                            git: 'commit-status',
+                            root: orig,
+                            result: null
+                        });
                     }
                 }
             });
@@ -185,28 +284,32 @@ async.map(gitPaths, function (item, cb) {
 
         if (err) {
             console.error(err);
-            cb(null);
+            cb(err);
         }
         else {
 
             var runPush = false;
-            results = results.filter(function (item) {
-                return item;
+
+            results.filter(function (item) {
+                return item.result;   //note: result is defined if there is uncommitted or unpushed code
             }).forEach(function () {
                 runPush = true;
             });
 
             if (force && runPush) {
 
-                const c = 'git add . && git add -A && git commit -am "auto-commit" && git push';
-                cp.exec(c, {cwd: $cwd}, function (err, stdout, stderr) {
+                const cmd = 'git add . && git add -A && git commit -am "auto-commit" && git push';
+                cp.exec(cmd, {cwd: $cwd}, function (err, stdout, stderr) {
                     if (err) {
-                        console.error(err);
-                        cb(err);
+                        cb(null, {
+                            error: err,
+                            root: orig,
+                            git: 'run-all',
+                            push: false
+                        });
                     }
                     else {
-                        debug('\nrun push stdout:\n' + stdout);   //TODO: if no upstream is defined, does stdout or stderr show "error" or "Error"??
-                        debug('\nrun push stderr:\n' + stderr);
+                        //TODO: if no upstream is defined, does stdout or stderr show "error"/"Error"??
                         const error1 = String(stdout).match(/Error/i);
                         const error2 = String(stderr).match(/Error/i);
                         if (error1 || error2) {
@@ -219,27 +322,34 @@ async.map(gitPaths, function (item, cb) {
                         }
                         else {
                             cb(null, {
+                                root: orig,
                                 push: true,
-                                root: orig
+                                git: 'run-all'
                             });
                         }
                     }
                 });
             }
-            else if (force) {  //
+            else if (force) {
                 cb(null, {
                     push: null,
-                    root: orig
+                    root: orig,
+                    git: 'run-all'
                 });
             }
             else if (runPush) {
                 cb(null, {
+                    push: null,
                     root: orig,
                     git: 'run-all'
                 });
             }
             else {
-                cb(null);
+                cb(null, {
+                    root: orig,
+                    push: null,
+                    git: 'run-all'
+                });
             }
         }
     });
@@ -247,30 +357,27 @@ async.map(gitPaths, function (item, cb) {
 
 }, function complete(err, results) {
     if (err) {
-
-         if(String(err).match(/insufficient permission/i)){
-             console.error('\nInsufficient permission to run git commands, try sudo.\n');
-         }
-        else{
-             console.error('Unexpected error:\n', err);  //is the sudo error here
-         }
-
+        if (String(err).match(/insufficient permission/i)) {
+            console.error('\nInsufficient permission to run git commands, try sudo.\n');
+        }
+        else {
+            console.error('Unexpected error, most likely at path=', err.root, '\n', err,
+                '\n', 'probable reason is that you don\'t have push rights without logging in.');  //is the sudo error here
+        }
     }
     else {
-        debug('Results => \n', results);
+        console.log('Results => \n', results);
 
         var allGood = true;
+        var noErrors = true;
 
-        results.filter(function (item) {
-
-            return item && String(item).length > 0;
-
-        }).forEach(function (item) {
+        results.forEach(function (item) {
 
             if (item.error) {
+                noErrors = false;
                 allGood = false;
                 console.log('\nNostos: The following project roots git errors.');
-                console.log(' => ', JSON.stringify(item.root), '\n');
+                console.log(' => ', JSON.stringify(item.root), '\n', item.error);
             }
             else if (item.push === null) {
                 console.log('\nNostos: The following project experienced no errors, but were not pushed.');
@@ -305,11 +412,14 @@ async.map(gitPaths, function (item, cb) {
                     console.log(colors.blue(p), '\n');
                 })
             }
+            if (noErrors) {
+                console.log('\n', 'All git repos with uncommitted/unpushed code were successfully pushed.');
+            }
             else {
-                console.log('All git repos with uncommitted/unpushed code were successfully pushed.');
+                console.log('\n', 'At least one of your commands experienced errors. You may need to configure SSH with Github.');
             }
         }
-        else{
+        else {
 
         }
     }
